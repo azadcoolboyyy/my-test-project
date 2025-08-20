@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Falling Walls Enhanced</title>
+  <style>
+    body { margin:0; background:#111; overflow:hidden; }
+    canvas { display:block; margin:auto; background:#222; }
+    #msg {
+      position: absolute; top: 40%; width: 100%; text-align: center;
+      font-size: 32px; color: white; font-family: sans-serif; display: none;
+    }
+  </style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="msg">Game Over<br>Press SPACE to Restart</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+canvas.width = 400;
+canvas.height = 500;
+
+let player, walls, shields, score, alive, keys;
+
+function resetGame() {
+  player = { x: canvas.width/2 - 15, y: canvas.height - 40, w: 30, h: 30, speed: 5, shield: false };
+  walls = [];
+  shields = [];
+  score = 0;
+  alive = true;
+  keys = {};
+  document.getElementById("msg").style.display = "none";
+}
+
+function spawnWall() {
+  let w = 80;
+  let hole = Math.floor(Math.random()*(canvas.width - w));
+  walls.push({ y: -20, holeX: hole, holeW: w });
+}
+
+function spawnShield() {
+  let shieldX = Math.random()*(canvas.width-30);
+  shields.push({ x: shieldX, y: -20, w:30, h:30 });
+}
+
+function update() {
+  if (!alive) return;
+
+  // Move player
+  if (keys["ArrowLeft"] || keys["a"] || keys["A"]) player.x -= player.speed;
+  if (keys["ArrowRight"] || keys["d"] || keys["D"]) player.x += player.speed;
+
+  if (player.x < 0) player.x = 0;
+  if (player.x + player.w > canvas.width) player.x = canvas.width - player.w;
+
+  // Clear screen
+  ctx.fillStyle = "#222";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // Draw player
+  ctx.fillStyle = player.shield ? "cyan" : "#00ffff";
+  ctx.strokeStyle = player.shield ? "purple" : "white";
+  ctx.lineWidth = 3;
+  ctx.fillRect(player.x, player.y, player.w, player.h);
+  ctx.strokeRect(player.x, player.y, player.w, player.h);
+
+  // Update walls
+  ctx.fillStyle = "#ff5555";
+  for (let i=0;i<walls.length;i++) {
+    let wall = walls[i];
+    wall.y += 3;
+
+    ctx.fillRect(0, wall.y, wall.holeX, 20);
+    ctx.fillRect(wall.holeX+wall.holeW, wall.y, canvas.width-(wall.holeX+wall.holeW), 20);
+
+    // Collision
+    if (player.y < wall.y+20 && player.y+player.h > wall.y) {
+      if (player.x < wall.holeX || player.x+player.w > wall.holeX+wall.holeW) {
+        if(player.shield) {
+          walls.splice(i,1); // destroy wall
+          player.shield = false; // shield gone
+          i--;
+        } else {
+          alive = false;
+          document.getElementById("msg").style.display = "block";
+        }
+      }
+    }
+  }
+
+  walls = walls.filter(w=>w.y < canvas.height);
+
+  // Spawn shield every 2000 score
+  if(score>0 && score % 2000 === 0 && !shields.some(s=>s.spawnedAt===score)) {
+    spawnShield();
+    shields[shields.length-1].spawnedAt = score; // prevent multiple spawns at same score
+  }
+
+  // Update shields
+  ctx.fillStyle = "purple";
+  for(let i=0;i<shields.length;i++){
+    let s = shields[i];
+    s.y += 3;
+    ctx.fillRect(s.x, s.y, s.w, s.h);
+
+    // Pickup shield
+    if(player.x < s.x + s.w && player.x+player.w > s.x &&
+       player.y < s.y + s.h && player.y+player.h > s.y){
+      player.shield = true;
+      shields.splice(i,1);
+      i--;
+    }
+  }
+
+  shields = shields.filter(s=>s.y < canvas.height);
+
+  // Draw score
+  ctx.fillStyle = "white";
+  ctx.font = "20px sans-serif";
+  ctx.fillText("Score: "+score, 10, 25);
+
+  score++;
+}
+
+setInterval(spawnWall, 1500);
+
+function loop() {
+  update();
+  requestAnimationFrame(loop);
+}
+loop();
+
+// Track keys
+document.addEventListener("keydown", e=>{
+  keys[e.key] = true;
+  if(e.key===" " && !alive) resetGame();
+});
+document.addEventListener("keyup", e=>{
+  keys[e.key] = false;
+});
+
+resetGame();
+</script>
+</body>
+</html>
